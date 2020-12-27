@@ -12,3 +12,5 @@ keras
 gensim
 h5py
 docopt
+tqdm
+tabulate

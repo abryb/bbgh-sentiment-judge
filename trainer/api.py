@@ -1,184 +1,165 @@
-import typing
-import requests
 import datetime
+import typing
+from enum import Enum
+import time
+import urllib3.connection
 
-X = typing.TypeVar('X')
-
-
-class ListResponse(typing.Generic[X]):
-    def __init__(self, number_of_elements: int, items: typing.Iterator[X]):
-        self.number_of_elements = number_of_elements
-        self.items = items
-
-    @staticmethod
-    def from_data(data: dict, items_func):
-        return ListResponse(data['numberOfElements'], map(items_func, data['content']))
+import requests
 
 
-class ApiError(ConnectionError):
+class Error(ConnectionError):
     pass
 
 
-class ApiArticle(typing.NamedTuple):
+class Article(typing.NamedTuple):
     id: int
     content: str
-    creation_date: datetime.datetime
     updated_at: datetime.datetime
 
     @staticmethod
-    def from_data(data: dict) -> 'ApiArticle':
+    def from_data(data: dict) -> 'Article':
         if data['updatedAt']:
             updated_at = datetime.datetime.strptime(data['updatedAt'], '%Y-%m-%dT%H:%M:%S')
         else:
             updated_at = datetime.datetime.fromtimestamp(0)
-        return ApiArticle(
+        return Article(
             id=data['id'],
             content=data['content'],
-            creation_date=datetime.datetime.strptime(data['creationDate'], '%Y-%m-%dT%H:%M:%S'),
             updated_at=updated_at
         )
 
 
-class ApiComment(typing.NamedTuple):
+class Comment(typing.NamedTuple):
     id: int
     content: str
 
     @staticmethod
-    def from_data(data: dict) -> 'ApiComment':
-        return ApiComment(
+    def from_data(data: dict) -> 'Comment':
+        return Comment(
             id=data['id'],
             content=data['content']
         )
 
 
-class ApiPlayer(typing.NamedTuple):
-    id: int
-    first_name: str
-    last_name: str
-
-    @staticmethod
-    def from_data(data: dict) -> 'ApiPlayer':
-        return ApiPlayer(
-            id=data['id'],
-            first_name=data['firstName'],
-            last_name=data['lastName']
-        )
-
-    def to_dict(self) -> dict:
-        return self._asdict()
-
-    @staticmethod
-    def from_dict(data: dict) -> 'ApiPlayer':
-        return ApiPlayer(
-            id=data["id"],
-            first_name=data["first_name"],
-            last_name=data["last_name"],
-        )
+class MentionSentiment(Enum):
+    NOT_CHECKED = ''
+    POSITIVE = ''
+    NEUTRAL = ''
+    NEGATIVE = ''
 
 
-class ApiMention(typing.NamedTuple):
-    id: int
-    comment: ApiComment
-    player: ApiPlayer
-    sentiment: str
-    starts_at: int
-    ends_at: int
+class MentionExpanded(object):
+    def __init__(self, data: dict):
+        self.id = data['id']
+        self.article_id = data['articleId']
+        self.comment_id = data['commentId']
+        self.comment_content = data['commentContent']
+        self.player_id = data['playerId']
+        self.sentiment = data['mentionSentiment']
+        self.starts_at = data['startsAt']
+        self.ends_at = data['endsAt']
+        self.sentiment_marked_by_human = data['sentimentMarkedByHuman']
 
-    @staticmethod
-    def from_data(data: dict) -> 'ApiMention':
-        return ApiMention(
-            id=data['id'],
-            comment=ApiComment.from_data(data['comment']),
-            player=ApiPlayer.from_data(data['player']),
-            sentiment=data['sentiment'],
-            starts_at=data['startsAt'],
-            ends_at=data['endsAt']
-        )
+    def parts(self):
+        before_subject = self.comment_content[0:self.starts_at - 1]
+        subject = self.comment_content[self.starts_at:self.ends_at]
+        after_subject = self.comment_content[self.ends_at:]
+        return before_subject, subject, after_subject
 
+    def anonymous_parts(self):
+        before, subject, after = self.parts()
+        return before, "subject", after
 
-class ApiMentionExpanded(typing.NamedTuple):
-    id: int
-    article_id: int
-    comment_id: int
-    comment_content: str
-    player_id: int
-    sentiment: str
-    starts_at: int
-    ends_at: int
-
-    @staticmethod
-    def from_data(data: dict) -> 'ApiMentionExpanded':
-        return ApiMentionExpanded(
-            id=data['id'],
-            article_id=data['articleId'],
-            comment_id=data['commentId'],
-            comment_content=data['commentContent'],
-            player_id=data['playerId'],
-            sentiment=data['mentionSentiment'],
-            starts_at=data['startsAt'],
-            ends_at=data['endsAt']
-        )
+    def anonymous_comment_content(self):
+        before, subject, after = self.anonymous_parts()
+        return before + subject + after
 
 
-class ApiClient(object):
-    def __init__(self, host):
+class Api(object):
+    def __init__(self, host: str):
         self.host = host
 
-    def all_checked_mentions(self):
-        for item in self._all_items('/api/mentions', {'sentiments': 'POSITIVE,NEUTRAL,NEGATIVE'}):
-            yield ApiMentionExpanded.from_data(item)
+    def articles(self, updated_after: datetime.datetime = None) -> dict:
+        return self._get_list("/api/articles", {'updatedAfter': self._date_or_none(updated_after)})
 
-    def articles(self, page=0, size=20, sort=None) -> ListResponse[ApiArticle]:
-        data = self._get_list('/api/articles', {'page': page, 'size': size, 'sort': sort})
-        return ListResponse.from_data(data, lambda x: ApiArticle.from_data(x))
+    def all_articles(self, updated_after: datetime.datetime = None, sort: str = None) -> typing.Iterator[Article]:
+        for item in self._all_items('/api/articles',
+                                    {'updatedAfter': self._date_or_none(updated_after),
+                                     'sort': sort}):
+            yield Article.from_data(item)
 
-    def all_articles_updated_after(self, updated_after: datetime.datetime):
-        params = {'sort': 'updatedAt,ASC', 'updatedAfter': updated_after.strftime("%Y-%m-%dT%H:%M:%S")}
-        for item in self._all_items('/api/articles', params):
-            yield ApiArticle.from_data(item)
-
-    def article_comments(self, article_id, page=0, size=20):
-        data = self._get_list('/api/articles/{}/comments'.format(article_id), {'page': page, 'size': size})
-        return ListResponse.from_data(data, lambda x: ApiComment.from_data(x))
-
-    def all_article_comments(self, article_id) -> typing.Iterator[ApiComment]:
+    def all_article_comments(self, article_id) -> typing.Iterator[Comment]:
         for item in self._all_items('/api/articles/{}/comments'.format(article_id)):
-            yield ApiComment.from_data(item)
+            yield Comment.from_data(item)
 
-    def all_players(self) -> typing.Iterator[ApiPlayer]:
-        for item in self._all_items('/api/players'):
-            yield ApiPlayer.from_data(item)
+    def all_comments(self, ) -> typing.Iterator[Comment]:
+        for article in self.all_articles():
+            for comment in self.all_article_comments(article.id):
+                yield comment
 
-    def all_comment_mentions(self, comment_id : int) -> typing.Iterator[ApiMention]:
-        for item in self._all_items('/api/comment/{}/mentions'.format(comment_id)):
-            yield ApiMention.from_data(item)
+    def mentions(self) -> dict:
+        return self._get_list("/api/mentions", {})
 
-    def create_mention(self, comment_id: int, player_id: int, starts_at=0, ends_at=0) -> ApiMentionExpanded:
-        r = self._post("/api/mentions", {
-            "commentId": comment_id,
-            "playerId": player_id,
-            "startsAt": starts_at,
-            "endsAt": ends_at
+    def all_mentions(self, sort: str = None) -> typing.Iterator[MentionExpanded]:
+        params = {'sort': sort}
+        for item in self._all_items('/api/mentions', params):
+            yield MentionExpanded(item)
+
+    def all_checked_mentions(self, ) -> typing.Iterator[MentionExpanded]:
+        for item in self._all_items('/api/mentions', {'sentiment': ['POSITIVE', 'NEUTRAL', 'NEGATIVE']}):
+            yield MentionExpanded(item)
+
+    def all_not_checked_mentions(self, ) -> typing.Iterator[MentionExpanded]:
+        for item in self._all_items('/api/mentions', {'sentiment': ['NOT_CHECKED']}):
+            yield MentionExpanded(item)
+
+    def update_mention_sentiment(self, mention_id: int, sentiment: str):
+        return self._post("/api/mentions/{}/sentiment".format(mention_id), {
+            "human": False,
+            "mentionSentiment": sentiment,
         })
-        return ApiMentionExpanded.from_data(r)
+
+    def update_mentions_sentiments(self, positive_ids, neutral_ids, negative_ids):
+        return self._post("/api/mentions/sentiments", {
+            "items": [
+                {
+                    "ids": positive_ids,
+                    "sentiment": "POSITIVE"
+                },
+                {
+                    "ids": neutral_ids,
+                    "sentiment": "NEUTRAL"
+                },
+                {
+                    "ids": negative_ids,
+                    "sentiment": "NEGATIVE"
+                }
+            ],
+        })
 
     def _post(self, path: str, json: dict):
         resp = requests.post(self.host + path, json=json)
         if resp.status_code not in [200, 201]:
-            raise ApiError('POST {} {} {}'.format(path, resp.status_code, resp.json()))
-        return resp.json()
+            raise Error('POST {} {} {} {}'.format(path, json, resp.status_code, resp.json()))
+        return resp
 
     def _get_list(self, path: str, params) -> dict:
-        resp = requests.get(self.host + path, params=params)
+        try:
+            resp = requests.get(self.host + path, params=params)
+        except urllib3.connection.HTTPConnection as e:
+            print("HTTP Connection error when doing GET {}. Going to sleep for 3s...".format(path))
+            time.sleep(3)
+            return self._get_list(path, params)
+
         if resp.status_code != 200:
             # This means something went wrong.
-            raise ApiError('GET {} {}'.format(path, resp.status_code))
+            raise Error('GET {} {}'.format(path, resp.status_code))
         return resp.json()
 
     def _all_items(self, path: str, params: typing.Optional[dict] = None) -> typing.Iterator[dict]:
         if params is None:
             params = {}
-        items_per_page = 200
+        items_per_page = 250
         count = items_per_page
         page = 0
         while count == items_per_page:
@@ -188,3 +169,6 @@ class ApiClient(object):
             for item in items['content']:
                 yield item
 
+    @staticmethod
+    def _date_or_none(date) -> str:
+        return date.strftime("%Y-%m-%dT%H:%M:%S") if date is not None else None

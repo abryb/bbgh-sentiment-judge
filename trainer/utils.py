@@ -1,16 +1,16 @@
-import code
-import readline
-import rlcompleter
+import urllib.request
+
+from tqdm import tqdm
 
 
-def interactive_console(_globals, _locals):
-    """
-    Opens interactive console with current execution state.
-    Call it with: `console.open(globals(), locals())`
-    """
-    context = _globals.copy()
-    context.update(_locals)
-    readline.set_completer(rlcompleter.Completer(context).complete)
-    readline.parse_and_bind("tab: complete")
-    shell = code.InteractiveConsole(context)
-    shell.interact()
+class DownloadProgressBar(tqdm):
+    def update_to(self, b=1, bsize=1, tsize=None):
+        if tsize is not None:
+            self.total = tsize
+        self.update(b * bsize - self.n)
+
+
+def download_url(url, output_path):
+    with DownloadProgressBar(unit='B', unit_scale=True,
+                             miniters=1, desc=url.split('/')[-1]) as t:
+        urllib.request.urlretrieve(url, filename=output_path, reporthook=t.update_to)

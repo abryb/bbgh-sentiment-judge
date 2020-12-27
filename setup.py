@@ -22,7 +22,7 @@ setuptools.setup(
     version="0.0.1",
     author="Błażej Rybarkiewicz",
     author_email="b.rybarkiewicz@gmail.com",
-    description="Sentiment judge module for Piłkomentarz project",
+    description="Sentiment trainer module for Piłkomentarz project",
     url="https://github.com/abryb/bbgh-sentiment-judge",
     packages=setuptools.find_packages(),
     install_requires=REQUIRED_PACKAGES,
