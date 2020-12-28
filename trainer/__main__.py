@@ -7,7 +7,7 @@ Usage:
     trainer predict [--all] [options]
     trainer publish [--all] [options]
     trainer show_prediction <mention_id> [options]
-    trainer run
+    trainer run [--train]
 
 Options:
     -v                      Debug output.
@@ -70,4 +70,6 @@ if __name__ == '__main__':
         worker.show_prediction(int_or_none(arguments['<mention_id>']))
 
     elif arguments['run']:
-        worker.run()
+        worker.run(
+            train=arguments['--train']
+        )

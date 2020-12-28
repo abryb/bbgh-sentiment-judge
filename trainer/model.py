@@ -28,22 +28,22 @@ class Model(object):
         self.word2vector = word2vector
         self.model = None
         self.parameters = {
-            'maxlen': 0,
-            'epochs': 0,
-            'batch_size': 0
+            'maxlen': 32,
+            'epochs': 44,
+            'batch_size': 32
         }
 
     def train(self,
               train_mentions,
               val_mentions=None,
-              epochs=12,
-              batch_size=32,
-              maxlen=32,
+              epochs=None,
+              batch_size=None,
+              maxlen=None,
               verbose=1
               ):
-        self.parameters['maxlen'] = maxlen
-        self.parameters['epochs'] = epochs
-        self.parameters['batch_size'] = batch_size
+        self.parameters['maxlen'] = maxlen or self.parameters['maxlen']
+        self.parameters['epochs'] = epochs or self.parameters['epochs']
+        self.parameters['batch_size'] = batch_size or self.parameters['batch_size']
 
         # 1. Define model
         self.model = Sequential()
@@ -64,8 +64,8 @@ class Model(object):
         val_xy = (self._mentions_to_xs(val_mentions), self._mentions_to_ys(val_mentions)) if val_mentions else ()
 
         self.model.fit(train_x, train_y,
-                       epochs=epochs,
-                       batch_size=batch_size,
+                       epochs=self.parameters['epochs'],
+                       batch_size=self.parameters['batch_size'],
                        shuffle=True,
                        validation_data=val_xy,
                        verbose=verbose)

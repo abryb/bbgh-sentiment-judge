@@ -2,8 +2,14 @@
 
 Single command usage:
 ```shell script
-docker-compose up --build
+# first build docker container
+docker-compose build
+# run training and predict and publish
+docker-compose run app python -m trainer run --train
+# run only predict and publish
+docker-compose run app python -m trainer run
 ```
+
 
 ### Process
 
