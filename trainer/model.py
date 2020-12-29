@@ -1,15 +1,17 @@
-from keras.preprocessing.text import Tokenizer
-from keras.models import load_model, Sequential
-from keras.layers import Dense, Activation, LSTM, Masking, Input
-from keras.utils import np_utils
-from tabulate import tabulate
-from pathlib import Path
-from trainer.api import MentionExpanded
-import trainer.word2vector
 import json
 import os
 import typing
+from pathlib import Path
+
 import numpy as np
+from keras.layers import Dense, Activation, LSTM, Masking, Input, Concatenate
+from keras.models import load_model, Sequential, Model as KerasModel
+from keras.preprocessing.text import Tokenizer
+from keras.utils import np_utils
+from tabulate import tabulate
+
+import trainer.word2vector
+from trainer.api import MentionExpanded
 
 np.random.seed(7)
 
@@ -37,29 +39,45 @@ class Model(object):
               epochs=None,
               batch_size=None,
               maxlen=None,
-              verbose=1
+              verbose=1,
+              version='bi'
               ):
         self.parameters['maxlen'] = maxlen or self.parameters['maxlen']
         self.parameters['epochs'] = epochs or self.parameters['epochs']
         self.parameters['batch_size'] = batch_size or self.parameters['batch_size']
 
-        # 1. Define model
-        self.model = Sequential()
-        self.model.add(Input(shape=(None, 300)))
-        self.model.add(Masking(mask_value=self.word2vector.neutral_vector))
-        self.model.add(LSTM(128, recurrent_dropout=0.5, dropout=0.5, input_shape=(None, 300)))
-        self.model.add(Dense(3))
-        self.model.add(Activation('softmax'))
+        train_mentions = [m for m in train_mentions if m.sentiment == 'POSITIVE'] + train_mentions
+        train_x, train_y = self._mentions_to_xs(train_mentions), self._mentions_to_ys(train_mentions)
+        val_x, val_y = None, None
+        if val_mentions:
+            val_x, val_y = self._mentions_to_xs(val_mentions), self._mentions_to_ys(val_mentions)
 
+        # 1. Define model
+        if version == 'bi':
+            input = Input(shape=(None, 300))
+            masking = Masking(mask_value=self.word2vector.zero_vector)(input)
+            output = Activation('softmax')(
+                    (Dense(3)(
+                        Concatenate(axis=1)([
+                            LSTM(128, recurrent_dropout=0.5, dropout=0.5)(masking),
+                            LSTM(128, recurrent_dropout=0.5, dropout=0.5, go_backwards=True)(masking)
+                        ])
+                    ))
+                )
+            self.model = KerasModel(input, output)
+        else:
+            self.model = Sequential()
+            self.model.add(Input(shape=(None, 300)))
+            self.model.add(Masking(mask_value=self.word2vector.zero_vector))
+            self.model.add(LSTM(128, recurrent_dropout=0.5, dropout=0.5))
+            self.model.add(Dense(3))
+            self.model.add(Activation('softmax'))
+
+        # 2. train model
         self.model.summary()
         self.model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
 
-        # 2. train model
-        positive_train_mentions = list(filter(lambda x: x.sentiment == 'POSITIVE', train_mentions))
-        train_mentions = positive_train_mentions + train_mentions
-        train_x, train_y = self._mentions_to_xs(train_mentions), self._mentions_to_ys(train_mentions)
-
-        val_xy = (self._mentions_to_xs(val_mentions), self._mentions_to_ys(val_mentions)) if val_mentions else ()
+        val_xy = (val_x, val_y) if val_x is not None else None
 
         self.model.fit(train_x, train_y,
                        epochs=self.parameters['epochs'],
