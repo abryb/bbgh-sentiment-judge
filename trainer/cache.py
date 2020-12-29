@@ -29,7 +29,7 @@ class FileCache(object):
             return self.get(name)
         else:
             result = create()
-            if not self.has(name):  # save if create function didn't saved it already
+            if not self.has(name):  # skip if create function has already saved
                 self.save(name, result)
             return result
 

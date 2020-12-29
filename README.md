@@ -1,43 +1,31 @@
-### Usage
-
-Single command usage:
-```shell script
-# first build docker container
-docker-compose build
-# run training and predict and publish
-docker-compose run app python -m trainer run --train
-# run only predict and publish
-docker-compose run app python -m trainer run
-```
-
-
 ### Process
 
-##### 1. First step. Download pretrained word2vec and training it on articles and comments texts
+##### 1. First step. Download pretrained word2vec and train it on articles and comments texts
 
 ```shell script
-python -m trainer train_word2vec
+python -m trainer prepare_word2vec
 ```
-
-This can take up to 3 hours. 
-
-This operation creates 1 file in `Data` directory:
-- `word2vector.trained_model.pickle` - Saved Word2Vec model.
+This operation creates 4 files in `Data` directory:
+- `repository.articles.pickle` - File with downloaded articles
+- `repository.comments.pickle` - File with downloaded comments
+- `word2vector.model.pretrained.pickle` - Pretrained model downloaded from http://dsmodels.nlp.ipipan.waw.pl/.
+- `word2vector.model.trained_on_articles_and_comments` - Model trained on articles and comments.
 
 ##### 2. Download mentions.
 
-```
+```shell script
 python -m trainer download_mentions
 ```
 
 This operations creates 2 cache files in `Data` directory:  
-- `word2vector.dictionary.pickle` - a pickle file of dictionary for words which appear in mentions  
-- `repository.mentions.pickle` - file with all mentions
+- `repository.mentions.pickle` - file with downloaded mentions
+- `word2vector.model.trained_on_mentions.pickle` - Saved Word2Vec model.
+- `worker.dataset.pickle` - Mentions split to train, test and val sets.
 
 ##### 3. Train model 
 
 ```shell script
-python -m trainer train --maxlen=32 --epochs=44 --save
+python -m trainer train --maxlen=32 --epochs=22 --save
 ```
 
 This command trains our keras model and saves it in `Models` directory. 

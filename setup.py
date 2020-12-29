@@ -14,7 +14,9 @@ REQUIRED_PACKAGES = [
     'keras',
     'gensim',
     'h5py',
-    'docopt'
+    'docopt',
+    'tqdm',
+    'tabulate'
 ]
 
 setuptools.setup(

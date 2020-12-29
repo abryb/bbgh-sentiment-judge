@@ -1,19 +1,17 @@
-import json
-import os
-import typing
-
-import numpy as np
-
-np.random.seed(7)
 from keras.preprocessing.text import Tokenizer
 from keras.models import load_model, Sequential
 from keras.layers import Dense, Activation, LSTM, Masking, Input
 from keras.utils import np_utils
 from tabulate import tabulate
 from pathlib import Path
-
 from trainer.api import MentionExpanded
 import trainer.word2vector
+import json
+import os
+import typing
+import numpy as np
+
+np.random.seed(7)
 
 
 class Model(object):
@@ -48,7 +46,7 @@ class Model(object):
         # 1. Define model
         self.model = Sequential()
         self.model.add(Input(shape=(None, 300)))
-        self.model.add(Masking(mask_value=self.word2vector.default_vector))
+        self.model.add(Masking(mask_value=self.word2vector.neutral_vector))
         self.model.add(LSTM(128, recurrent_dropout=0.5, dropout=0.5, input_shape=(None, 300)))
         self.model.add(Dense(3))
         self.model.add(Activation('softmax'))
@@ -135,7 +133,7 @@ class Model(object):
 
         def index2vector(index):
             if index == 0:
-                return self.word2vector.default_vector
+                return self.word2vector.zero_vector
             return self.word2vector.get_vector(tokenizer.index_word[index])
 
         xs = np.zeros((len(mentions), maxlen, 300))

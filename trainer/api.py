@@ -1,10 +1,9 @@
 import datetime
-import typing
-from enum import Enum
 import time
-import urllib3.connection
+import typing
 
 import requests
+import urllib3.connection
 
 
 class Error(ConnectionError):
@@ -41,13 +40,6 @@ class Comment(typing.NamedTuple):
         )
 
 
-class MentionSentiment(Enum):
-    NOT_CHECKED = ''
-    POSITIVE = ''
-    NEUTRAL = ''
-    NEGATIVE = ''
-
-
 class MentionExpanded(object):
     def __init__(self, data: dict):
         self.id = data['id']
@@ -61,14 +53,14 @@ class MentionExpanded(object):
         self.sentiment_marked_by_human = data['sentimentMarkedByHuman']
 
     def parts(self):
-        before_subject = self.comment_content[0:self.starts_at - 1]
+        before_subject = self.comment_content[0:self.starts_at]
         subject = self.comment_content[self.starts_at:self.ends_at]
         after_subject = self.comment_content[self.ends_at:]
         return before_subject, subject, after_subject
 
     def anonymous_parts(self):
         before, subject, after = self.parts()
-        return before, "subject", after
+        return before, "przedmiotopinii", after
 
     def anonymous_comment_content(self):
         before, subject, after = self.anonymous_parts()
@@ -146,7 +138,7 @@ class Api(object):
     def _get_list(self, path: str, params) -> dict:
         try:
             resp = requests.get(self.host + path, params=params)
-        except urllib3.connection.HTTPConnection as e:
+        except urllib3.connection.HTTPConnection:
             print("HTTP Connection error when doing GET {}. Going to sleep for 3s...".format(path))
             time.sleep(3)
             return self._get_list(path, params)

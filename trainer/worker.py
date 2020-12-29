@@ -33,22 +33,14 @@ class Worker(object):
         self.models_dir = models_dir
         self.model_loaded = False
 
-    def train_word2vec(self):
+    def prepare_word2vec(self):
         self.repository.download_articles_and_comments()
-        self.word2vector.train_word2vec_model()
+        self.word2vector.train_on_articles_and_comments()
 
     def download_mentions(self):
         self.repository.download_mentions(only_missing=False)
-        self.word2vector.train_word2vec_model_on_mentions()
-        self.word2vector.create_word2vector_dictionary_for_repository_mentions()
-        self.split_mentions()
-
-    def split_mentions(self):
-        mentions = list(self.repository.get_checked_mentions_marked_by_human())
-        train_mentions, test_mentions = train_test_split(mentions, test_size=0.2)
-        train_mentions, val_mentions = train_test_split(train_mentions, test_size=0.2)
-        self.cache.save("worker.dataset", (train_mentions, val_mentions, test_mentions))
-        return train_mentions, val_mentions, test_mentions
+        self.word2vector.train_on_mentions()
+        self._split_mentions()
 
     def train(
             self,
@@ -164,9 +156,17 @@ class Worker(object):
                 print("0 mentions found. Nothing to do here...")
 
     def _get_mentions(self):
-        return self.cache.get_or_create("worker.dataset", self.split_mentions)
+        return self.cache.get_or_create("worker.dataset", self._split_mentions)
 
     def _load_model(self):
         if not self.model_loaded:
             self.model.load(self.models_dir)
             self.model_loaded = True
+
+    def _split_mentions(self):
+        mentions = list(self.repository.get_checked_mentions_marked_by_human())
+        train_mentions, test_mentions = train_test_split(mentions, test_size=0.2)
+        train_mentions, val_mentions = train_test_split(train_mentions, test_size=0.2)
+        self.cache.save("worker.dataset", (train_mentions, val_mentions, test_mentions))
+        return train_mentions, val_mentions, test_mentions
+

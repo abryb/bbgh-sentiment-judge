@@ -1,6 +1,5 @@
 import os
 import tempfile
-import typing
 import zipfile
 
 import numpy as np
@@ -13,89 +12,46 @@ from trainer.utils import download_url
 
 
 class Word2Vector(object):
-    default_vector = np.zeros(300)
+    neutral_vector = np.repeat(1, 300)
+    zero_vector = np.zeros(300)
 
     def __init__(self, cache: trainer.cache.FileCache, repository: trainer.repository.Repository):
         self.cache = cache
         self.repository = repository
-        self._word2vector: typing.Optional[dict] = None
 
     def get_vector(self, word: str):
-        if self._word2vector is None:
-            self._word2vector = self.cache.get_or_create("word2vector.dictionary",
-                                                         self.create_word2vector_dictionary_for_repository_mentions)
-        if word in self._word2vector:
-            return self._word2vector[word]
-        return self.default_vector
+        m = self._get_model_trained_on_mentions()
+        if word in m.wv.vocab:
+            return m.wv.get_vector(word)
+        return self.neutral_vector
 
-    def create_word2vector_dictionary_for_repository_mentions(self):
-        print("Creating word2vector dictionary for words in mentions...")
-        self._word2vector = self.cache.get_or_create("word2vector.dictionary", lambda: dict())
-        mentions = self.repository.get_mentions()
-        tokenizer = Tokenizer()
-        tokenizer.fit_on_texts([m.anonymous_comment_content() for m in mentions])
-        missing = list("subject")
-        for word in list(tokenizer.word_index):
-            if word not in self._word2vector:
-                missing.append(word)
-        print("Found {} missing words in word2vector dictionary.".format(len(missing)))
-        if len(missing) > 0:
-            word2vec_model = self._get_trained_on_mentions_model()
-            for word in missing:
-                self._word2vector[word] = self.default_vector
-                if word in word2vec_model.wv.vocab:
-                    index = word2vec_model.wv.vocab[word].index
-                    self._word2vector[word] = word2vec_model.wv.vectors[index]
-            self.cache.save("word2vector.dictionary", self._word2vector)
-        return self._word2vector
+    def train_on_articles_and_comments(self):
+        print("Training word2vec model on articles and comments.")
+        model = self._get_model_pretrained()
+        articles, comments = self.repository.get_articles_and_comments()
+        texts = [x.content for x in articles] + [x.content for x in comments]
+        self._train_model(model, texts)
+        self.cache.save('word2vector.model.trained_on_articles_and_comments', model)
+        return model
 
-    def _get_trained_on_mentions_model(self):
-        return self.cache.get_or_create('word2vector.trained_on_mentions_model', self.train_word2vec_model_on_mentions)
-
-    def _get_trained_model(self) -> Word2Vec:
-        return self.cache.get_or_create('word2vector.trained_model', self.train_word2vec_model)
-
-    def train_word2vec_model_on_mentions(self):
+    def train_on_mentions(self):
         print("Training word2vec model on mentions.")
-        model = self._get_trained_model()
+        model = self._get_model_trained_on_articles_and_comments()
         mentions = self.repository.get_mentions()
         texts = [m.anonymous_comment_content() for m in mentions]
-        tokenizer = Tokenizer()
-        texts_seq = tokenizer.sequences_to_texts(tokenizer.texts_to_sequences(texts))
-        print("Adding to word2vec vocabulary...")
-        model.build_vocab(texts_seq, update=True)
-        print("Training word2vec ...")
-        model.train(
-            texts_seq,
-            total_examples=len(texts_seq),
-            epochs=model.epochs)
-
-        self.cache.save('word2vector.trained_on_mentions_model', model)
+        self._train_model(model, texts)
+        self.cache.save('word2vector.model.trained_on_mentions', model)
         return model
 
-    def train_word2vec_model(self):
-        print("Training word2vec model on articles and comments.")
-        model = self._get_pretrained_model()
-        articles, comments = self.repository.get_articles_and_comments()
-        texts = list()
-        texts = texts + [x.content for x in articles] + [x.content for x in comments]
+    def _get_model_trained_on_mentions(self):
+        return self.cache.get_or_create('word2vector.model.trained_on_mentions', self.train_on_mentions)
 
-        tokenizer = Tokenizer()
-        tokenizer.fit_on_texts(texts)
-        model.min_count = 2
-        texts_seq = tokenizer.sequences_to_texts(tokenizer.texts_to_sequences(texts))
-        print("Adding to word2vec vocabulary...")
-        model.build_vocab(texts_seq, update=True)
-        print("Training word2vec ...")
-        model.train(
-            texts_seq,
-            total_examples=len(texts_seq),
-            epochs=model.epochs)
+    def _get_model_trained_on_articles_and_comments(self) -> Word2Vec:
+        return self.cache.get_or_create(
+            'word2vector.model.trained_on_articles_and_comments',
+            self.train_on_articles_and_comments)
 
-        self.cache.save('word2vector.trained_model', model)
-        return model
-
-    def _get_pretrained_model(self) -> Word2Vec:
+    def _get_model_pretrained(self) -> Word2Vec:
         def create():
             directory = tempfile.gettempdir()
             pre_trained_model_file = directory + "/nkjp+wiki-forms-all-300-skipg-hs-50"
@@ -121,4 +77,18 @@ class Word2Vector(object):
 
             return model
 
-        return self.cache.get_or_create('word2vector.pre_trained_model', create)
+        return self.cache.get_or_create('word2vector.model.pretrained', create)
+
+    def _train_model(self, model: Word2Vec, texts):
+        tokenizer = Tokenizer()
+        tokenizer.fit_on_texts(texts)
+        texts_seq = tokenizer.sequences_to_texts(tokenizer.texts_to_sequences(texts))
+        texts_seq = [f.split(" ") for f in texts_seq]
+        print("Adding to word2vec vocabulary...")
+        model.min_count = 2
+        model.build_vocab(texts_seq, update=True)
+        print("Training word2vec ...")
+        model.train(
+            texts_seq,
+            total_examples=len(texts_seq),
+            epochs=model.epochs)

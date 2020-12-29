@@ -1,6 +1,6 @@
 """
 Usage:
-    trainer train_word2vec [options]
+    trainer prepare_word2vec [options]
     trainer download_mentions [options]
     trainer train [--epochs=<epochs> --maxlen=<maxlen> --batch-size=<batch_size> --train-on-all --val --save] [options]
     trainer evaluate [options]
@@ -8,6 +8,7 @@ Usage:
     trainer publish [--all] [options]
     trainer show_prediction <mention_id> [options]
     trainer run [--train]
+    trainer inspect
 
 Options:
     -v                      Debug output.
@@ -17,8 +18,10 @@ Options:
     --models-dir=<value>    Models dir
 """
 from docopt import docopt
-
 from trainer.worker import Worker
+import readline
+import code
+import rlcompleter
 
 
 def int_or_none(value):
@@ -39,8 +42,8 @@ if __name__ == '__main__':
         models_dir=arguments['--models-dir']
     )
 
-    if arguments['train_word2vec']:
-        worker.train_word2vec()
+    if arguments['prepare_word2vec']:
+        worker.prepare_word2vec()
 
     elif arguments['download_mentions']:
         worker.download_mentions()
@@ -73,3 +76,10 @@ if __name__ == '__main__':
         worker.run(
             train=arguments['--train']
         )
+    elif arguments['inspect']:
+        context = globals().copy()
+        context.update(locals())
+        readline.set_completer(rlcompleter.Completer(context).complete)
+        readline.parse_and_bind("tab: complete")
+        shell = code.InteractiveConsole(context)
+        shell.interact()
