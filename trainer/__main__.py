@@ -7,7 +7,7 @@ Usage:
     trainer predict [--all] [options]
     trainer publish [--all] [options]
     trainer show_prediction <mention_id> [options]
-    trainer run [--train]
+    trainer run
     trainer inspect
 
 Options:
@@ -22,6 +22,9 @@ from trainer.worker import Worker
 import readline
 import code
 import rlcompleter
+import gc
+import time
+import datetime
 
 
 def int_or_none(value):
@@ -31,25 +34,33 @@ def int_or_none(value):
 if __name__ == '__main__':
     arguments = docopt(__doc__)
 
+    worker = None
+
     if arguments['-v']:
         import logging
 
         logging.basicConfig(level=logging.DEBUG)
 
-    worker = Worker(
-        backend_host=arguments['--backend-host'],
-        cache_dir=arguments['--cache-dir'],
-        models_dir=arguments['--models-dir']
-    )
+
+    def get_worker():
+        global worker
+        if worker is None:
+            worker = Worker(
+                backend_host=arguments['--backend-host'],
+                cache_dir=arguments['--cache-dir'],
+                models_dir=arguments['--models-dir']
+            )
+        return worker
+
 
     if arguments['prepare_word2vec']:
-        worker.prepare_word2vec()
+        get_worker().prepare_word2vec()
 
     elif arguments['download_mentions']:
-        worker.download_mentions()
+        get_worker().download_mentions()
 
     elif arguments['train']:
-        worker.train(
+        get_worker().train(
             epochs=int_or_none(arguments['--epochs']),
             val=arguments['--val'],
             train_on_all=arguments['--train-on-all'],
@@ -58,24 +69,36 @@ if __name__ == '__main__':
             batch_size=int_or_none(arguments['--batch-size'])
         )
     elif arguments['evaluate']:
-        worker.evaluate()
+        get_worker().evaluate()
 
     elif arguments['predict']:
-        worker.predict(
+        get_worker().predict(
             only_not_checked=not arguments['--all']
         )
 
     elif arguments['publish']:
-        worker.publish(
+        get_worker().publish(
             only_unpublished=not arguments['--all']
         )
     elif arguments['show_prediction']:
-        worker.show_prediction(int_or_none(arguments['<mention_id>']))
+        get_worker().show_prediction(int_or_none(arguments['<mention_id>']))
 
     elif arguments['run']:
-        worker.run(
-            train=arguments['--train']
+        get_worker().run(
+            train=False
         )
+        while 1:
+            # simple scheduler to run after 2 o'clock
+            print("Sleep for 1 hour...")
+            time.sleep(3600)
+            if datetime.datetime.now().hour > 2:
+                print("2 o'clock, we'll run!")
+                get_worker().run(
+                    train=False
+                )
+                worker = None
+                gc.collect()
+
     elif arguments['inspect']:
         context = globals().copy()
         context.update(locals())

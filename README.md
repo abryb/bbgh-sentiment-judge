@@ -1,9 +1,14 @@
 ### Process
 
+##### 0. Build docker container
+```shell script
+docker-compose build
+```
+
 ##### 1. First step. Download pretrained word2vec and train it on articles and comments texts
 
 ```shell script
-python -m trainer prepare_word2vec
+docker compose run app python -m trainer prepare_word2vec
 ```
 This operation creates 4 files in `Data` directory:
 - `repository.articles.pickle` - File with downloaded articles
@@ -14,7 +19,7 @@ This operation creates 4 files in `Data` directory:
 ##### 2. Download mentions.
 
 ```shell script
-python -m trainer download_mentions
+docker compose run app  python -m trainer download_mentions
 ```
 
 This operations creates 2 cache files in `Data` directory:  
@@ -25,14 +30,14 @@ This operations creates 2 cache files in `Data` directory:
 ##### 3. Train model 
 
 ```shell script
-python -m trainer train --maxlen=32 --epochs=22 --save
+docker compose run app  python -m trainer train --maxlen=32 --epochs=22 --save
 ```
 
 This command trains our keras model and saves it in `Models` directory. 
 
 ##### 4. Predict mentions sentiments
 ```shell script
-python -m trainer predict
+docker compose run app  python -m trainer predict
 ``` 
 
 This command takes our model from step 3 and runs model.predict on all mentions 
@@ -42,10 +47,15 @@ This operations creates 1 file:
 - `repository.predictions.pickle` - file with all our guesses about mentions sentiments
 
 
-
 ##### 5. Publish predicted sentiments
 ```shell script
-python -m trainer publish
+docker compose run app  python -m trainer publish
 ```
 
 This command published our predicted sentiments. 
+
+
+##### 6. Run worker
+```shell script
+docker compose up
+```
