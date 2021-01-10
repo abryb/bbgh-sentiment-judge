@@ -89,10 +89,9 @@ if __name__ == '__main__':
         )
         while 1:
             # simple scheduler to run after 2 o'clock
-            print("Sleep for 1 hour...")
-            time.sleep(3600)
+            print("Sleep for 2 hours...")
+            time.sleep(3600 * 2)
             if datetime.datetime.now().hour > 2:
-                print("2 o'clock, we'll run!")
                 get_worker().run(
                     train=False
                 )
