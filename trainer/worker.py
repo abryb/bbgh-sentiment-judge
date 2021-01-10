@@ -135,25 +135,13 @@ class Worker(object):
                 [mention_id, prediction.sentiment, prediction.published],
             ], headers=['Mention ID', 'Sentiment', 'Published']))
 
-    def run(self, train=False):
-        if train:
-            self.download_mentions()
-            if train:
-                self.train(
-                    train_on_all=True,
-                    save=True,
-                    verbose=2
-                )
-
-            self.predict(only_not_checked=False)
-            self.publish(only_unpublished=False)
+    def run(self):
+        mentions = self.repository.download_not_checked_mentions()
+        if len(mentions) > 0:
+            self.predict(only_not_checked=True)
+            self.publish(only_unpublished=True)
         else:
-            mentions = self.repository.download_not_checked_mentions()
-            if len(mentions) > 0:
-                self.predict(only_not_checked=True)
-                self.publish(only_unpublished=True)
-            else:
-                print("0 mentions found. Nothing to do here...")
+            print("0 mentions found. Nothing to do here...")
 
     def _get_mentions(self):
         return self.cache.get_or_create("worker.dataset", self._split_mentions)

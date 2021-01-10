@@ -26,7 +26,6 @@ import gc
 import time
 import datetime
 
-
 def int_or_none(value):
     return int(value) if value is not None else None
 
@@ -84,19 +83,18 @@ if __name__ == '__main__':
         get_worker().show_prediction(int_or_none(arguments['<mention_id>']))
 
     elif arguments['run']:
-        get_worker().run(
-            train=False
-        )
         while 1:
-            # simple scheduler to run after 2 o'clock
-            print("Sleep for 2 hours...")
-            time.sleep(3600 * 2)
-            if datetime.datetime.now().hour > 2:
-                get_worker().run(
-                    train=False
-                )
-                worker = None
-                gc.collect()
+            get_worker().run()
+            print("Freeing memory...")
+            worker = None
+            gc.collect()
+            next_run = datetime.datetime.now() + datetime.timedelta(days=1)
+            next_run.replace(hour=2, minute=0, second=0, microsecond=0)
+            print("Waiting for tomorrow 2AM...")
+            while 1:
+                time.sleep(300)
+                if datetime.datetime.now() > next_run:
+                    break
 
     elif arguments['inspect']:
         context = globals().copy()

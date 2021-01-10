@@ -39,8 +39,7 @@ class Model(object):
               epochs=None,
               batch_size=None,
               maxlen=None,
-              verbose=1,
-              version='bi'
+              verbose=1
               ):
         self.parameters['maxlen'] = maxlen or self.parameters['maxlen']
         self.parameters['epochs'] = epochs or self.parameters['epochs']
@@ -53,25 +52,17 @@ class Model(object):
             val_x, val_y = self._mentions_to_xs(val_mentions), self._mentions_to_ys(val_mentions)
 
         # 1. Define model
-        if version == 'bi':
-            input = Input(shape=(None, 300))
-            masking = Masking(mask_value=self.word2vector.zero_vector)(input)
-            output = Activation('softmax')(
-                    (Dense(3)(
-                        Concatenate(axis=1)([
-                            LSTM(128, recurrent_dropout=0.5, dropout=0.5)(masking),
-                            LSTM(128, recurrent_dropout=0.5, dropout=0.5, go_backwards=True)(masking)
-                        ])
-                    ))
-                )
-            self.model = KerasModel(input, output)
-        else:
-            self.model = Sequential()
-            self.model.add(Input(shape=(None, 300)))
-            self.model.add(Masking(mask_value=self.word2vector.zero_vector))
-            self.model.add(LSTM(128, recurrent_dropout=0.5, dropout=0.5))
-            self.model.add(Dense(3))
-            self.model.add(Activation('softmax'))
+        input_layer = Input(shape=(None, 300))
+        masking_layer = Masking(mask_value=self.word2vector.zero_vector)(input_layer)
+        output_layer = Activation('softmax')(
+            Dense(3)(
+                Concatenate(axis=1)([
+                    LSTM(128, recurrent_dropout=0.5, dropout=0.5)(masking_layer),
+                    LSTM(128, recurrent_dropout=0.5, dropout=0.5, go_backwards=True)(masking_layer)
+                ])
+            )
+        )
+        self.model = KerasModel(input_layer, output_layer)
 
         # 2. train model
         self.model.summary()
