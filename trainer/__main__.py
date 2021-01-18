@@ -84,18 +84,7 @@ if __name__ == '__main__':
         get_worker().show_prediction(int_or_none(arguments['<mention_id>']))
 
     elif arguments['run']:
-        def run():
-            global worker
-            get_worker().run()
-            worker = None
-            gc.collect()
-
-        run()
-        print("Running schedule... every day at 02:30")
-        schedule.every().day.at('02:30').do(run)
-        while 1:
-            schedule.run_pending()
-            time.sleep(60)
+        get_worker().run()
 
     elif arguments['inspect']:
         context = globals().copy()

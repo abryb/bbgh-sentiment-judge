@@ -57,6 +57,19 @@ This command published our predicted sentiments.
 
 ##### 6. Run worker
 
+Run worker that downloads not checked mentions, establishes its' sentiment and pushes it
 ```shell script
-docker-compose up
+docker-compose run app  python -m trainer run
+```
+
+##### Scheduler
+
+Run worker in scheduler mode
+```shell script
+docker-compose run app  python -m trainer.scheduler
+```
+
+Run worker in scheduler mode with up:
+```shell script
+docker-compose up -d
 ```
