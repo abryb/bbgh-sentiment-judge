@@ -24,7 +24,8 @@ import code
 import rlcompleter
 import gc
 import time
-import datetime
+import schedule
+
 
 def int_or_none(value):
     return int(value) if value is not None else None
@@ -83,18 +84,18 @@ if __name__ == '__main__':
         get_worker().show_prediction(int_or_none(arguments['<mention_id>']))
 
     elif arguments['run']:
-        while 1:
+        def run():
+            global worker
             get_worker().run()
-            print("Freeing memory...")
             worker = None
             gc.collect()
-            next_run = datetime.datetime.now() + datetime.timedelta(days=1)
-            next_run.replace(hour=2, minute=0, second=0, microsecond=0)
-            print("Waiting for tomorrow 2AM...")
-            while 1:
-                time.sleep(300)
-                if datetime.datetime.now() > next_run:
-                    break
+
+        run()
+        print("Running schedule... every day at 02:30")
+        schedule.every().day.at('02:30').do(run)
+        while 1:
+            schedule.run_pending()
+            time.sleep(60)
 
     elif arguments['inspect']:
         context = globals().copy()

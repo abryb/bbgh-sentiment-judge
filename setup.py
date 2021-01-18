@@ -1,23 +1,7 @@
 import setuptools
 
-REQUIRED_PACKAGES = [
-    'requests',
-    'python-dotenv',
-    'Unidecode',
-    'setuptools',
-    'pandas',
-    'matplotlib',
-    'livelossplot',
-    'numpy',
-    'tensorflow',
-    'sklearn',
-    'keras',
-    'gensim',
-    'h5py',
-    'docopt',
-    'tqdm',
-    'tabulate'
-]
+with open('requirements.txt') as f:
+    reqs = f.read().splitlines()
 
 setuptools.setup(
     name="trainer",
@@ -27,7 +11,7 @@ setuptools.setup(
     description="Sentiment trainer module for Piłkomentarz project",
     url="https://github.com/abryb/bbgh-sentiment-judge",
     packages=setuptools.find_packages(),
-    install_requires=REQUIRED_PACKAGES,
+    install_requires=reqs,
     classifiers=[
         "Programming Language :: Python :: 3",
         "Operating System :: OS Independent",

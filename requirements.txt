@@ -1,16 +1,13 @@
 requests
-python-dotenv
 Unidecode
 setuptools
-pandas
-matplotlib
-livelossplot
 numpy
 tensorflow
 sklearn
 keras
 gensim
 h5py
+schedule
 docopt
 tqdm
 tabulate
