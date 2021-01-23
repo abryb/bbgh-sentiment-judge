@@ -73,3 +73,15 @@ Run worker in scheduler mode with up:
 ```shell script
 docker-compose up -d
 ```
+
+#### Inspect mode
+
+Command:
+```shell script
+docker-compose run app  python -m trainer inspect
+```
+opens python interactive shell:
+```python
+worker = get_worker()
+worker.word2vector.get_vector('lewandowksi')
+```

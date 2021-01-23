@@ -22,8 +22,6 @@ from trainer.worker import Worker
 import readline
 import code
 import rlcompleter
-import gc
-import time
 import schedule
 
 
